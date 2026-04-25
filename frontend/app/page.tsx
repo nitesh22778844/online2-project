@@ -38,7 +38,7 @@ function Spinner() {
   return (
     <div className="flex flex-col items-center gap-3 py-10">
       <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      <p className="text-gray-500 text-sm">Searching Flipkart Minutes...</p>
+      <p className="text-gray-500 text-sm">Searching Flipkart...</p>
     </div>
   );
 }
@@ -51,14 +51,9 @@ function FuzzyBanner({ matchedQuery }: { matchedQuery: string }) {
   );
 }
 
-function ResultsTable({ products, pincodeUnverified }: { products: Product[]; pincodeUnverified?: boolean }) {
+function ResultsTable({ products }: { products: Product[] }) {
   return (
     <div className="overflow-x-auto rounded-2xl shadow-md bg-white">
-      {pincodeUnverified && (
-        <p className="text-xs text-amber-600 px-4 pt-3">
-          Pincode unverified — prices may vary by location
-        </p>
-      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
@@ -198,11 +193,11 @@ export default function Home() {
     <main className="min-h-screen flex flex-col items-center justify-start pt-16 px-4 pb-16">
       {/* Header */}
       <div className="mb-8 text-center">
-        <div className="inline-flex items-center gap-2 bg-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">
-          &#9889; Flipkart Minutes
+        <div className="inline-flex items-center gap-2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">
+          &#9889; Flipkart
         </div>
         <h1 className="text-3xl font-bold text-gray-900">Price Checker</h1>
-        <p className="text-gray-500 mt-1 text-sm">Hyperlocal prices for pincode 560094 (Bengaluru)</p>
+        <p className="text-gray-500 mt-1 text-sm">Search products and prices on Flipkart</p>
       </div>
 
       {/* Search form */}
@@ -212,7 +207,7 @@ export default function Home() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Try: milk, mango, bread..."
+            placeholder="Try: laptop, phone, headphones..."
             className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white shadow-sm"
             disabled={loading}
             aria-label="Product search"
@@ -236,12 +231,12 @@ export default function Home() {
             {result.fuzzy_corrected && result.matched_query && (
               <FuzzyBanner matchedQuery={result.matched_query} />
             )}
-            <ResultsTable products={result.products} pincodeUnverified={result.pincode_unverified} />
+            <ResultsTable products={result.products} />
           </>
         )}
 
         {!loading && noResults && (
-          <ErrorCard message="No products found on Flipkart Minutes for this query." />
+          <ErrorCard message="No products found on Flipkart for this query." />
         )}
 
         {!loading && scrapeFailed && (

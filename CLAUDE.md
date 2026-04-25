@@ -1,4 +1,4 @@
-# CLAUDE.md — Flipkart Minutes Price Fetcher
+# CLAUDE.md — Flipkart Price Checker
 # Implementation Memory & Reference
 
 This file was originally a planning document. It has been updated to reflect the **actual implementation** —
@@ -48,12 +48,12 @@ Visual C++ 2015-2022 Redistributable (x64) system-wide.
 
 ## 1. Objective
 
-Build a **lightweight web app** that takes a product name and returns the **current price on Flipkart Minutes**
-(Flipkart's hyperlocal/quick-commerce grocery service, `marketplace=HYPERLOCAL`).
+Build a **lightweight web app** that takes a product name and returns **current prices on Flipkart**
+(`marketplace=FLIPKART`).
 
-- User types a product name (e.g. Milk, Mango, or even a typo like `laptap`).
-- Backend searches Flipkart Minutes via headless browser automation.
-- Result page shows the matched product name and its price.
+- User types a product name (e.g. laptop, phone, or even a typo like `laptap`).
+- Backend searches Flipkart via headless browser automation.
+- Result page shows a table of up to 5 matching products with prices.
 - **No login / no sign-in.** Anonymous browsing only.
 - **Fuzzy matching** so misspellings still resolve.
 
@@ -63,10 +63,10 @@ Build a **lightweight web app** that takes a product name and returns the **curr
 
 ```
 https://www.flipkart.com/search?q={PRODUCT_NAME}&otracker=search&otracker1=search
-  &marketplace=HYPERLOCAL&as-show=off&as=off
+  &marketplace=FLIPKART&as-show=on&as=off
 ```
 
-`marketplace=HYPERLOCAL` scopes to Flipkart Minutes inventory.
+`marketplace=FLIPKART` targets regular Flipkart inventory. `as-show=on` enables auto-suggest display.
 
 **Implemented as `config.build_search_url(product_name)`:**
 ```python
@@ -78,8 +78,8 @@ def build_search_url(product_name: str) -> str:
         "q": product_name,
         "otracker": "search",
         "otracker1": "search",
-        "marketplace": "HYPERLOCAL",
-        "as-show": "off",
+        "marketplace": "FLIPKART",
+        "as-show": "on",
         "as": "off",
     }
     return f"{base}?{urlencode(params, quote_via=quote_plus)}"
@@ -89,53 +89,12 @@ Direct HTTP GET is blocked (403). Only Playwright (headless browser) works.
 
 ---
 
-## 3. Pincode — fixed at 560094 (IMPLEMENTATION NOTES)
-
-Flipkart Minutes is hyperlocal — prices vary by pincode. Hardcoded: **560094** (Bengaluru / Sanjay Nagar).
-
-### 3.1 What actually works (discovered during build)
-
-**Cookie injection does NOT work reliably.** Setting `T` or `SN` cookies before navigation does not suppress
-the location modal or populate prices. These approaches were tested and failed.
-
-**UI interaction is the only reliable method.** When navigating to a HYPERLOCAL search URL with a fresh
-browser context, Flipkart shows a **"Select delivery address"** modal. The scraper handles it as follows:
-
-```
-Flow:
-1. Navigate to SEARCH_URL → networkidle
-2. Modal appears: "Select delivery address" with a search input
-3. Fill input with "560094" (matches: placeholder*='pin', placeholder*='area', placeholder*='street', placeholder*='name')
-4. Wait 3 seconds for autocomplete AJAX to load suggestions
-5. Click first <div> where: text includes "560094" AND text.length < 100 AND el.onclick is truthy
-6. Wait 2 seconds for the map/confirm screen to render
-7. Click element with text "Confirm"
-8. Wait 2 seconds
-9. Re-navigate to SEARCH_URL → prices appear
-```
-
-**CRITICAL:** Resource blocking (`BLOCK_HEAVY_RESOURCES=true`) must be **disabled during the initial
-navigation and pincode setup.** CSS/stylesheets are needed for the modal to render and the input to be
-visible to Playwright. Apply resource blocking only AFTER pincode is confirmed, for subsequent navigations.
-
-Implemented in `backend/app/scraper.py`:
-- `_set_pincode_ui(page)` — handles the modal interaction
-- `_navigate_and_set_pincode(page, url)` — navigates without blocking, calls `_set_pincode_ui` if needed
-- `_apply_resource_blocking(page)` — called AFTER setup
-
-### 3.2 Verification
-
-After pincode is set and search results load, check `config.PINCODE in body or "Bengaluru" in body`.
-If not found, set `pincode_unverified: true` in the response but still return the price.
-
----
-
-## 4. Architecture
+## 3. Architecture
 
 ```
 ┌─────────────────────┐         ┌──────────────────────┐         ┌────────────────────┐
 │   Next.js 14        │  HTTP   │   Python FastAPI      │  Plw   │   Flipkart.com     │
-│   frontend          │ ──────► │   backend             │ ─────► │   (HYPERLOCAL      │
+│   frontend          │ ──────► │   backend             │ ─────► │   (FLIPKART        │
 │   (one page)        │  JSON   │   + Playwright        │        │    marketplace)    │
 └─────────────────────┘         └──────────────────────┘         └────────────────────┘
                                           │
@@ -146,7 +105,7 @@ If not found, set `pincode_unverified: true` in the response but still return th
                                   └──────────────────┘
 ```
 
-### 4.0 Lightweight budget (maintained)
+### 3.0 Lightweight budget (maintained)
 
 | Metric | Ceiling | Actual |
 |---|---|---|
@@ -158,7 +117,7 @@ If not found, set `pincode_unverified: true` in the response but still return th
 
 No database. No Redis. No Docker Compose.
 
-### 4.1 Stack
+### 3.1 Stack
 
 | Layer | Choice |
 |---|---|
@@ -168,10 +127,10 @@ No database. No Redis. No Docker Compose.
 | Fuzzy match | rapidfuzz 3.x |
 | Tests | pytest + pytest-asyncio (backend), Vitest + React Testing Library (frontend) |
 
-### 4.2 Project layout (actual)
+### 3.2 Project layout (actual)
 
 ```
-flipkart-minutes-price/
+flipkart-price/
 ├── CLAUDE.md                        <- this file (implementation memory)
 ├── README.md                        <- install + run instructions
 ├── preflight.py                     <- gate check; run before starting scraper
@@ -213,9 +172,9 @@ flipkart-minutes-price/
 
 ---
 
-## 5. Backend specification (actual implementation)
+## 4. Backend specification (actual implementation)
 
-### 5.1 API contract
+### 4.1 API contract
 
 **GET /health** → `{"status": "ok"}`
 
@@ -223,24 +182,24 @@ flipkart-minutes-price/
 
 Request: `{ "query": "laptap" }`
 
-Success response:
+Success response (returns up to 5 products):
 ```json
 {
   "ok": true,
   "query": "laptap",
   "matched_query": "laptop",
   "fuzzy_corrected": true,
-  "pincode": "560094",
-  "pincode_unverified": false,
-  "product": {
-    "title": "HP 15s Laptop ...",
-    "price": 42990,
-    "price_display": "₹42,990",
-    "mrp": 54999,
-    "discount_pct": 22,
-    "url": "https://www.flipkart.com/...",
-    "image_url": "https://rukminim2.flixcart.com/..."
-  },
+  "products": [
+    {
+      "title": "HP 15s Laptop ...",
+      "price": 42990,
+      "price_display": "₹42,990",
+      "mrp": 54999,
+      "discount_pct": 22,
+      "url": "https://www.flipkart.com/...",
+      "image_url": "https://rukminim2.flixcart.com/..."
+    }
+  ],
   "scraped_at": "2026-04-25T10:15:30Z"
 }
 ```
@@ -249,7 +208,11 @@ Failure (no results): `{ "ok": false, "reason": "no_results", "message": "..." }
 Failure (blocked): `{ "ok": false, "reason": "scrape_failed", "message": "..." }`
 Validation error: HTTP 422 (Pydantic, empty query)
 
-### 5.2 Scraper — actual implementation (`scraper.py`)
+**Note:** No `pincode` or `pincode_unverified` fields — the app targets `marketplace=FLIPKART`, not HYPERLOCAL.
+
+CORS allows origins: `http://localhost:3000`, `http://localhost:3001`, `http://localhost:3002`.
+
+### 4.2 Scraper — actual implementation (`scraper.py`)
 
 #### playwright-stealth 2.x API (CHANGED from 1.x)
 
@@ -264,11 +227,11 @@ await stealth.apply_stealth_async(ctx)   # ctx = BrowserContext
 #### Browser context setup
 ```python
 browser = await pw.chromium.launch(
-    headless=True,
+    headless=config.PLAYWRIGHT_HEADLESS,
     args=["--disable-blink-features=AutomationControlled"],
 )
 ctx = await browser.new_context(
-    user_agent=USER_AGENT,
+    user_agent=ua,
     viewport={"width": 1366, "height": 768},
     locale="en-IN",
     timezone_id="Asia/Kolkata",
@@ -276,18 +239,25 @@ ctx = await browser.new_context(
 await Stealth().apply_stealth_async(ctx)
 ```
 
+#### Navigation (`_navigate`)
+
+Uses `domcontentloaded` (not `networkidle`) then waits up to 10s for `₹` to appear in the rendered DOM,
+since Flipkart is a SPA and prices load asynchronously:
+```python
+resp = await page.goto(url, timeout=..., wait_until="domcontentloaded")
+await page.wait_for_function("() => document.body.innerText.includes('₹')", timeout=10000)
+body = await page.content()
+```
+
 #### 4-layer fallback (as implemented)
 
 **Layer 1 — Playwright + stealth (primary)**
 1. Create browser context + apply stealth.
-2. Navigate to SEARCH_URL **without** resource blocking.
-3. If no prices on page: run `_set_pincode_ui(page)` (see Section 3.1).
-4. Re-navigate to SEARCH_URL.
-5. Apply resource blocking now (`_apply_resource_blocking(page)`).
-6. If prices present: run `_JS_EXTRACT` (see below) → `_product_from_js()`.
-7. If JS extraction fails: fall back to `parse_first_product_html(body)`.
-8. If no prices and no block: return `no_results`.
-9. If blocked: escalate to Layer 2.
+2. Navigate to SEARCH_URL via `_navigate`.
+3. If blocked: escalate to Layer 2.
+4. If not blocked: run `_JS_EXTRACT` on the live DOM → `_products_from_js()` (up to 5 products).
+5. If JS extraction empty but page has prices: fall back to `parse_first_product_html(body)`.
+6. If no prices: return `no_results`.
 
 **Layer 2 — Fresh context + rotated User-Agent**
 Same flow as Layer 1 with a randomly chosen UA from `config.USER_AGENTS[1:]`
@@ -310,33 +280,32 @@ def _is_blocked(body: str, status: int) -> bool:
     return False
 ```
 
-A large body (e.g. 396KB) with no prices is NOT treated as blocked — that is the
-unresolved-location-modal state, handled separately by `_set_pincode_ui`.
+A large body with no prices is treated as `no_results`, not blocked.
 
 #### JS product extractor (`_JS_EXTRACT`)
 
-Runs inside Playwright via `page.evaluate()`. Finds the first text node with `₹`,
-walks up the DOM to find a card containing a Flipkart product link + rukminim image,
-then extracts:
+Runs inside Playwright via `page.evaluate()`. Iterates up to 30 `<img src*="rukminim">` elements,
+walks up the DOM to find a product card (containing exactly one unique product URL), then extracts
+up to 5 results. Per card:
 
-- **price** = `Math.min(all ₹ amounts)` — the selling price (lower number)
-- **mrp** = `Math.max(all ₹ amounts)` — the original price (higher number), or null if equal
-- **discountPct** — from `(\d+)%\s*[Oo]ff` pattern in card text
-- **url** — first `<a href>` matching `/^https?:\/\/www\.flipkart\.com\/[^\/]+\/p\/[A-Z0-9]+/i`
-- **imageUrl** — first `<img src*="rukminim">` in card
+- **price** = `Math.min(all ₹ amounts)` — selling price (lower number)
+- **mrp** = first amount > price and ≤ price × 4 (guards against unrelated large numbers)
+- **discountPct** — from `(\d+)%\s*[Oo]ff` in card text; null if outside 1–95%
+- **title** — from `<a title>` attribute; strips leading badges ("Pre Order", "Add to Compare",
+  "Bestseller", "Sponsored") and trailing ratings suffix
+- **url** — first `<a href>` matching `PROD_RE`; base URL (query params stripped)
+- **imageUrl** — the `<img src>` that triggered the card walk
 
-**Important:** The card text order in Flipkart Minutes is `₹MRP ₹SellingPrice` (MRP first, lower
-selling price second). Using `Math.min` correctly extracts the selling price.
+**Deduplication:** `seenUrl` object prevents the same product URL appearing twice in results.
 
-**Important:** The product URL regex uses `PRODUCT_URL_RE = /^https?:\/\/www\.flipkart\.com\/[^\/]+\/p\/[A-Z0-9]+/i`.
-This avoids matching static asset paths like `/batman-returns/batman-returns/p/images/...`
-which contain `/p/` but are not product URLs.
+**PRODUCT_URL_RE** (Python): `r"https?://www\.flipkart\.com/[a-z0-9\-]+/p/[A-Z0-9]+"` (IGNORECASE).
+Uses `[a-z0-9\-]+` for the slug segment to avoid matching static asset paths.
 
 #### HTML regex parser (`parse_first_product_html`)
 
-Backup parser for Layer 3 (no live DOM). Uses regex on raw HTML:
+Backup parser for Layer 3 (no live DOM). Returns a single product dict. Uses regex on raw HTML:
 - Prices: `[₹]\s*([\d,]+)` — note: literal `₹` char, NOT `&#8377;`
-- Product URLs: `PRODUCT_URL_RE` pattern (same as JS extractor)
+- Product URLs: `PRODUCT_URL_RE` pattern
 - Images: `src="(https://rukminim[^"]+)"`
 
 **Fixture files must use the literal ₹ character, not `&#8377;`**, because the regex
@@ -344,18 +313,10 @@ does not decode HTML entities.
 
 #### Resource blocking
 
-Block `image`, `font`, `media`, `stylesheet` resources but ONLY after pincode setup:
-```python
-async def _apply_resource_blocking(page):
-    async def _block(route):
-        if route.request.resource_type in ("image", "font", "media", "stylesheet"):
-            await route.abort()
-        else:
-            await route.continue_()
-    await page.route("**/*", _block)
-```
+`_apply_resource_blocking(page)` is defined (blocks image/font/media/stylesheet) and respects
+`config.BLOCK_HEAVY_RESOURCES`, but is **not called** in the current `fetch_price` flow.
 
-### 5.3 Fuzzy matching (`fuzzy.py`)
+### 4.3 Fuzzy matching (`fuzzy.py`)
 
 Strategy: send raw user query to Flipkart (don't pre-correct). After getting a result,
 compute `fuzz.ratio(query, title)`. If score < 50, set `fuzzy_corrected: true`.
@@ -380,12 +341,11 @@ def maybe_correct(query: str) -> tuple[str, bool]:
 
 Validated cases: `milk→(milk,False)`, `mlik→(milk,True)`, `laptap→(laptop,True)`, `xyzqwerty→(xyzqwerty,False)`.
 
-### 5.4 Config (`config.py`)
+### 4.4 Config (`config.py`)
 
 All tunables in one place. Key values:
 ```
 PORT=8000
-PINCODE=560094
 SCRAPE_TIMEOUT_SECONDS=30
 PLAYWRIGHT_HEADLESS=true
 BLOCK_HEAVY_RESOURCES=true
@@ -393,9 +353,10 @@ USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, 
 LOG_LEVEL=INFO
 ```
 
-`config.USER_AGENTS` is a list of 4 UA strings rotated in Layer 2.
+`config.USER_AGENTS` is a list of 4 UA strings rotated in Layer 2. No `PINCODE` — the app no longer
+targets HYPERLOCAL.
 
-### 5.5 requirements.txt (pinned)
+### 4.5 requirements.txt (pinned)
 
 ```
 fastapi==0.115.*
@@ -415,21 +376,25 @@ After install: `playwright install chromium`.
 
 ---
 
-## 6. Frontend specification (actual implementation)
+## 5. Frontend specification (actual implementation)
 
 Single page (`frontend/app/page.tsx`), client component (`"use client"`).
+Page title (layout.tsx): "Flipkart Price Checker".
 
-### 6.1 Component structure (all in page.tsx)
+### 5.1 Component structure (all in page.tsx)
 
 | Component | Purpose |
 |---|---|
 | `Home` | Main page: state, form submit, result routing |
-| `Spinner` | Loading state: animated ring + "Searching Flipkart Minutes..." |
+| `Spinner` | Loading state: animated ring + "Searching Flipkart..." |
 | `FuzzyBanner` | Amber banner: "Showing results for **{matched_query}**" |
-| `ResultCard` | Product image (next/image), title, price (green/bold), struck-through MRP, discount badge, "View on Flipkart →" link |
+| `ResultsTable` | Multi-product table: thumbnail, title, price (green), struck MRP, discount badge, "View on Flipkart →" link |
 | `ErrorCard` | Red card for no_results / scrape_failed / network error |
 
-### 6.2 API call (fetch, no axios)
+`ResultsTable` renders a `<table>` with columns: #, Product (image + title), Price, MRP, Discount, link.
+The results container is `max-w-4xl` to accommodate the wider table.
+
+### 5.2 API call (fetch, no axios)
 
 ```typescript
 const res = await fetch("/api/price", {
@@ -442,7 +407,7 @@ const res = await fetch("/api/price", {
 
 `/api/price` is proxied to `http://localhost:8000/api/price` via `next.config.js` rewrites.
 
-### 6.3 next.config.js rewrites
+### 5.3 next.config.js rewrites
 
 ```js
 async rewrites() {
@@ -452,7 +417,7 @@ async rewrites() {
 
 Remote image domains are whitelisted: `rukminim2.flixcart.com`, `rukminim1.flixcart.com`.
 
-### 6.4 next/image mock for tests
+### 5.4 next/image mock for tests
 
 Vitest tests mock `next/image` as a plain `<img>` element:
 ```tsx
@@ -463,9 +428,9 @@ vi.mock("next/image", () => ({
 
 ---
 
-## 7. Tests
+## 6. Tests
 
-### 7.1 Backend — 17 unit tests (all pass)
+### 6.1 Backend — unit tests
 
 Run from `backend/` directory:
 ```bash
@@ -483,7 +448,10 @@ pytest tests/test_fuzzy.py tests/test_scraper.py tests/test_api.py -v
 **Patch path:** Always patch `app.main.fetch_price` (not `app.scraper.fetch_price`) because `main.py`
 imports with `from .scraper import fetch_price` — the binding is on the `main` module.
 
-### 7.2 Frontend — 8 Vitest tests (all pass)
+**Mock shape:** `MOCK_SUCCESS` must use `{ "ok": True, "products": [MOCK_PRODUCT_DICT] }` — a list,
+not a single `product` object. Tests check `data["products"][0]["price"]`.
+
+### 6.2 Frontend — 8 Vitest tests
 
 Run from `frontend/` directory:
 ```bash
@@ -491,12 +459,12 @@ cd frontend
 npm test
 ```
 
-Tests cover: input rendering, button disabled state, Enter key submit, success card,
+Tests cover: input rendering, button disabled state, Enter key submit, success table,
 discount badge, fuzzy banner, no-results error card.
 
 ---
 
-## 8. Running the app
+## 7. Running the app
 
 ```bash
 # 1. Backend
@@ -516,40 +484,36 @@ python preflight.py
 
 ### preflight.py
 
-Runs 3 checks:
-1. **Layer 1 probe** — Playwright + stealth; navigates to Milk search; handles pincode modal; checks for ₹.
+Runs checks:
+1. **Layer 1 probe** — Playwright + stealth; navigates to a product search; checks for ₹ in rendered DOM.
 2. **Layer 3 probe** — Plain HTTP GET; usually 403 (expected); pass if ₹ found.
-3. **Pincode probe** — Confirms "560094" or "Bengaluru" appears in page content after modal is handled.
 
 Prints `PREFLIGHT OK` or `PREFLIGHT FAILED` with details. Only Layer 1 passing is required for OK.
 
 ---
 
-## 9. Known risks & mitigations (updated with actuals)
+## 8. Known risks & mitigations (updated with actuals)
 
 | Risk | Status | Mitigation |
 |---|---|---|
 | Flipkart bot-detection blocks headless browser | **Active risk** (Layer 3 HTTP gets 403) | playwright-stealth 2.x + realistic UA/viewport/locale/timezone. 4-layer fallback. |
 | Flipkart changes DOM and breaks selectors | **Mitigated** | JS extractor uses content-based selectors (finds ₹, `rukminim` images, product URL pattern). No CSS class names. |
-| Pincode not respected | **Resolved** | UI interaction method works reliably. Cookie method was tested and does NOT work. |
 | Login modal blocks page | **Not observed** | Scraper does not sign in. If modal appears, no explicit handling — stealth + realistic UA seems to prevent it. |
 | Playwright + greenlet DLL issue on Python 3.14 | **Resolved** | Copy msvcp140.dll to Python root (see Section 0.1). |
-| Slow page load | **Mitigated** | 30s timeout. Resource blocking applied post-pincode. Stealth reduces detection/retry overhead. |
+| Slow page load | **Mitigated** | `domcontentloaded` + `wait_for_function` for ₹. 30s total timeout. Stealth reduces detection/retry overhead. |
 | `&#8377;` in HTML fixtures not matched by regex | **Resolved** | Fixture files use literal ₹ character. Parser regex uses literal ₹. |
 | playwright-stealth 2.x API break from 1.x | **Resolved** | Use `Stealth().apply_stealth_async(ctx)` on BrowserContext, not on page. |
 
 ---
 
-## 10. Definition of done (status)
+## 9. Definition of done (status)
 
 - [x] `npm run dev` and `uvicorn` both start cleanly on a fresh clone.
-- [x] Searching Milk returns real Flipkart Minutes price for pincode 560094 within 30s.
-- [x] Searching Mango returns a real price within 30s. *(live test)*
-- [x] Searching `laptap` returns a laptop result with "Did you mean: laptop" banner.
+- [x] Searching "laptop" returns up to 5 Flipkart results within 30s.
+- [x] Searching `laptap` returns laptop results with "Showing results for **laptop**" banner.
 - [x] Searching `asdfgh123` shows "No products found" message (no crash).
-- [x] Response includes `"pincode": "560094"`.
-- [x] `pytest -v` is green (17 unit tests).
-- [x] `pytest -m live -v` returns prices for Milk and Mango *(acknowledged flaky)*.
+- [x] `pytest -v` is green (unit tests).
+- [x] `pytest -m live -v` returns prices for real queries *(acknowledged flaky)*.
 - [x] `npm test` is green (8 tests).
 - [x] Lightweight budget respected (no DB, no Redis, no Docker Compose).
 - [x] README has install + run instructions.

@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PORT = int(os.getenv("PORT", "8000"))
-PINCODE = os.getenv("PINCODE", "560094")
 SCRAPE_TIMEOUT_SECONDS = int(os.getenv("SCRAPE_TIMEOUT_SECONDS", "30"))
 PLAYWRIGHT_HEADLESS = os.getenv("PLAYWRIGHT_HEADLESS", "true").lower() != "false"
 BLOCK_HEAVY_RESOURCES = os.getenv("BLOCK_HEAVY_RESOURCES", "true").lower() != "false"
@@ -30,8 +29,8 @@ def build_search_url(product_name: str) -> str:
         "q": product_name,
         "otracker": "search",
         "otracker1": "search",
-        "marketplace": "HYPERLOCAL",
-        "as-show": "off",
+        "marketplace": "FLIPKART",
+        "as-show": "on",
         "as": "off",
     }
     return f"{base}?{urlencode(params, quote_via=quote_plus)}"

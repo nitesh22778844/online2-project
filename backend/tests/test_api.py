@@ -32,7 +32,6 @@ MOCK_PRODUCT_DICT = {
 MOCK_SUCCESS = {
     "ok": True,
     "products": [MOCK_PRODUCT_DICT],
-    "pincode_unverified": False,
 }
 
 MOCK_FAILURE = {
@@ -44,7 +43,7 @@ MOCK_FAILURE = {
 MOCK_NO_RESULTS = {
     "ok": False,
     "reason": "no_results",
-    "message": "No products found on Flipkart Minutes for this query.",
+    "message": "No products found on Flipkart for this query.",
 }
 
 
@@ -70,7 +69,6 @@ async def test_price_success(client):
     data = r.json()
     assert data["ok"] is True
     assert data["products"][0]["price"] > 0
-    assert data["pincode"] == "560094"
 
 
 @pytest.mark.asyncio

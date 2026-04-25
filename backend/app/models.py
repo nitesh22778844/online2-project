@@ -22,8 +22,6 @@ class PriceResponse(BaseModel):
     query: str
     matched_query: Optional[str] = None
     fuzzy_corrected: bool = False
-    pincode: str = "560094"
-    pincode_unverified: bool = False
     products: Optional[List[ProductInfo]] = None
     scraped_at: Optional[datetime] = None
     reason: Optional[str] = None

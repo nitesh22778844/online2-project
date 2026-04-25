@@ -1,6 +1,11 @@
+import sys
+import asyncio
 import logging
 from datetime import datetime, timezone
 from fastapi import FastAPI
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 from fastapi.middleware.cors import CORSMiddleware
 
 from .models import PriceRequest, PriceResponse, ProductInfo
@@ -11,11 +16,11 @@ from . import config
 logging.basicConfig(level=config.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Flipkart Minutes Price Fetcher")
+app = FastAPI(title="Flipkart Price Fetcher")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
@@ -42,7 +47,6 @@ async def get_price(req: PriceRequest):
             query=raw_query,
             matched_query=corrected,
             fuzzy_corrected=was_corrected,
-            pincode=config.PINCODE,
             reason="scrape_failed",
             message="Flipkart blocked the request. Try again in a minute.",
         )
@@ -54,8 +58,6 @@ async def get_price(req: PriceRequest):
             query=raw_query,
             matched_query=corrected,
             fuzzy_corrected=was_corrected,
-            pincode=config.PINCODE,
-            pincode_unverified=result.get("pincode_unverified", False),
             products=products,
             scraped_at=datetime.now(timezone.utc),
         )
@@ -65,7 +67,6 @@ async def get_price(req: PriceRequest):
             query=raw_query,
             matched_query=corrected,
             fuzzy_corrected=was_corrected,
-            pincode=config.PINCODE,
             reason=result.get("reason", "unknown"),
             message=result.get("message", "Something went wrong."),
         )

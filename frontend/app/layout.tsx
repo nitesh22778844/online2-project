@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Flipkart Minutes Price",
-  description: "Check live prices on Flipkart Minutes (hyperlocal grocery delivery)",
+  title: "Flipkart Price Checker",
+  description: "Search products and check live prices on Flipkart",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
