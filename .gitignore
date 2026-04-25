@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+frontend/out/
+
+# Playwright
+playwright/.auth/
+test-results/
+playwright-report/
+
+# Claude Code local settings
+.claude/
+
+# Misc
+*.png
+debug_*.png
+.DS_Store
